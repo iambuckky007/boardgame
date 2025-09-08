@@ -23,6 +23,15 @@ environment {
 
 
     stages {
+
+        stages {
+        stage('Checkout') {
+            steps {
+                checkout([$class: 'GitSCM', branches: [[name: '*/master']],
+                userRemoteConfigs: [[url: 'https://github.com/iambuckky007/boardgame',
+                ]]])
+            }
+        }
         
         stage('SonarQube Analysis') {
             steps {
