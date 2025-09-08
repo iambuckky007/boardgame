@@ -1,164 +1,102 @@
 
-CI/CD Pipeline with Jenkins, SonarQube, Nexus, EKS, Prometheus & Grafana
-This project demonstrates an end-to-end CI/CD pipeline on AWS using Jenkins, SonarQube, Nexus, Kubernetes (EKS), Trivy, Prometheus, and Grafana.
-
+Project Overview
+============================================
+This project showcases a complete end-to-end CI/CD pipeline on AWS using Jenkins, SonarQube, Nexus, Kubernetes (EKS), Trivy, Prometheus, and Grafana.
+The pipeline automates builds, ensures security checks, and provides real-time monitoring of deployments into Kubernetes.
 The pipeline ensures secure, automated, and monitored deployments into Kubernetes.
 
-🚀 Architecture Overview
-EC2 Instances
 
-Jenkins Server (t3.medium) → CI/CD Orchestration
+Technologies Used
+==============================================
+1. CI/CD: Jenkins
 
-SonarQube Server (t3.medium) → Code Quality & Security Scanning
+2. Code Quality: SonarQube
 
-Nexus Server (t3.medium) → Artifact Repository (JAR/TAR storage)
+3. Artifact Repository: Nexus
 
-Monitoring Server (t3.medium) → Prometheus & Grafana
+4. Container Security: Trivy
 
-AWS EKS Cluster
+5. Container Registry: AWS ECR
 
+6. Orchestration: Kubernetes on AWS EKS
+
+7.Monitoring & Visualization: Prometheus, Grafana
+ 
+8. Cloud Infrastructure: AWS EC2, IAM, NLB
+
+
+
+Architecture Overview
+==================================================================
+
+1. EC2 Instances
+Main Web Server: To SSH into other server(such jenkins, nexus, etc.)
+Jenkins Server (t3.medium): CI/CD Orchestration
+SonarQube Server (t3.medium): Code Quality & Security Scanning
+Nexus Server (t3.medium): Artifact Repository (JAR/TAR storage)
+Monitoring Server (t3.medium): Prometheus & Grafana
+
+2. AWS ECR
+Used to store docker images after build and are pulled for deployment.
+
+3. AWS EKS Cluster
 Managed Kubernetes control plane
+Worker Node Group (2 EC2 nodes)
+Integrated with AWS ECR for storing container images
 
-Node Group with 2 EC2 worker nodes
-
-Integrated with AWS ECR for container images
-
-Monitoring
-
+4. Monitoring Layer
 Prometheus + Grafana dashboards
+Metrics collected via node-exporter and kube-state-metrics
 
-Metrics scraped via node-exporter and kube-state-metrics
+5. Jenkins Setup
+Opened port 8080 in the security group to allow Jenkins web UI access.
+Allowed SSH from single EC2(Main web server)
+Installed essential Jenkins plugins. (sonar, nexus, docker, aws creds, maven, jdk etc)
+Installed trivy on this EC2 server itself.
 
-🔧 Step-by-Step Setup
-1. Jenkins Setup (CI/CD Server)
-Installed Java as a prerequisite.
+6. SonarQube Setup (Code Quality)
+Deployed SonarQube on a separate EC2 instance (port 9000).
+Allowed SSH from single EC2(Main web server)
+Configured webhook → sends Quality Gate results back to Jenkins.
 
-Installed Jenkins and enabled the service.
+7. Nexus Repository Setup (Artifact Management)
+Installed Nexus Repository Manager on an EC2 server (port 8081).
+Allowed SSH from single EC2(Main web server)
+Created dedicated Maven hosted repositories for JARs (application builds)
 
-Opened port 8080 in Security Group.
-
-Installed necessary plugins:
-
-Git, Pipeline, SonarQube Scanner, Docker, Kubernetes, AWS ECR, Email-ext Plugin, Trivy Integration.
-
-Configured Jenkins credentials for GitHub, SonarQube, Nexus, AWS ECR, and SMTP for email notifications.
-
-2. SonarQube Setup (EC2)
-Installed SonarQube (default port 9000).
-
-Created webhook → triggers back to Jenkins after Quality Gate check.
-
-Pipeline halts if Quality Gate fails.
-
-3. Nexus Setup (EC2)
-Installed Nexus Repository Manager (port 8081).
-
-Configured Maven repositories for JAR/TAR storage.
-
-Linked Jenkins pipeline to upload built artifacts.
-
-4. AWS EKS Cluster
-Created EKS Cluster with IAM Role bindings.
-
-Added Node Group with 2 worker nodes.
-
-On Jenkins EC2:
-
+8. AWS EKS Cluster (Kubernetes Deployment)
+Provisioned an EKS cluster using AWS console/CLI.
+Configured IAM roles & RBAC bindings for Jenkins to deploy workloads.
+Added a managed node group with two EC2 worker nodes. On Jenkins EC2:
 Installed kubectl and AWS CLI.
+Updated aws-auth ConfigMap to allow node → cluster communication.
 
-Updated aws-auth ConfigMap with cluster role.
 
-Verified worker nodes using:
+9. Monitoring & Observability
+Provisioned Prometheus & Grafana on a monitoring EC2 instance.
+Open 9090 (Prometheus) and 3000 (Grafana) in the EC2 security group.
+Allowed SSH from single EC2(Main web server)
 
-bash
-kubectl get nodes
-5. CI/CD Pipeline (Jenkinsfile Stages)
-Pipeline Flow:
+Final Workflow
+=======================================================
+1. Developer pushes code → GitHub triggers Jenkins job.
 
-Checkout Code → Clone from GitHub
+2. Jenkins pipeline executes:
 
-SonarQube Analysis → Code quality and static analysis
+  -> Code analysis with SonarQube
 
-Quality Gate Check → Pipeline halts if failed
+  -> Quality Gate validation
 
-Maven Build → mvn clean install (Package JAR)
+  -> Build artifacts → Nexus
 
-Upload Artifact to Nexus → JAR pushed to Nexus repository
+  -> Docker image build → Trivy scan
 
-Docker Build → Create Image locally on Jenkins server
+  -> If secure → Push to AWS ECR
 
-Trivy Security Scan (New Stage)
+3. Deploy to EKS via manifests
 
-Run vulnerability scan on Docker image using Trivy
+4. Application exposed via NLB.
 
-Generate vulnerability report in HTML/JSON format
+5. Prometheus scrapes metrics → Grafana dashboards display insights.
 
-Email report to developer/team
-
-Pipeline halts if critical vulnerabilities found (configurable)
-
-Docker Push to AWS ECR → Securely push scanned image
-
-Kubernetes Deployment → Run kubectl apply -f deployment.yaml
-
-Deploys 2 Pods into EKS
-
-Configures NLB (Network Load Balancer) to expose service
-
-Email Notification (Final)
-
-When pipeline succeeds → Email summary sent to the team
-
-6. Monitoring (Prometheus + Grafana)
-Installed Prometheus and Grafana on Monitoring EC2.
-
-From Jenkins EC2:
-
-bash
-kubectl apply -f node-exporter.yaml
-kubectl apply -f kube-state-metrics.yaml
-Prometheus scrapes Kubernetes cluster metrics.
-
-Grafana visualizes performance dashboards for applications, pods, and nodes.
-
-📊 Final Workflow
-Developer pushes code → GitHub triggers Jenkins job
-
-Jenkins pipeline runs:
-
-Code analysis via SonarQube
-
-Quality Gate → Fail/Halt or Continue
-
-Build artifacts stored in Nexus
-
-Docker image built → Trivy Scan run
-
-Vulnerability report → Sent via Email
-
-If clean → Push image to ECR
-
-Deploy to EKS using Kubernetes manifests
-
-Service exposed via NLB
-
-Prometheus + Grafana → Monitor and visualize cluster/application health
-
-Success Email → Sent at end of pipeline run
-
-🖥️ Technologies Used
-CI/CD: Jenkins
-
-Code Quality: SonarQube
-
-Artifact Repository: Nexus
-
-Container Security: Trivy
-
-Container Registry: AWS ECR
-
-Orchestration: Kubernetes on AWS EKS
-
-Monitoring & Visualization: Prometheus, Grafana
-
-Cloud Infra: AWS EC2, IAM, NLB
+6. Email notifications sent on success/failure.
